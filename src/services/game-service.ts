@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
-import { BoardState, Game } from '../interfaces/game-interface';
+import { BoardState, Game, MovePayload } from '../interfaces/game-interface';
 
 const waitingPlayers: Socket[] = [];
 const activeGames = new Map<string, Game>();
@@ -66,3 +66,37 @@ export const handleDisconnect = (socket: Socket) => {
         console.log(`Removed waiting player after disconnect: ${socket.id}`);
     }
 };
+
+export const handleMakeMove = (io: Server, socket: Socket, payload: MovePayload) => {
+    const {roomId, cellIndex} = payload;
+
+    const game = activeGames.get(roomId);
+    if(!game) {
+        console.error(`Error: game not found, ${roomId}`);
+        socket.emit('error_message', {message: 'Game not found'});
+        return;
+    }
+    const PlayerSymbol = game.players['X'] == socket.id ? 'X' :'O';
+    if(game.currentPlayer !== PlayerSymbol) {
+        console.warn(`Warning, player ${socket.id} tried to move out of room ${roomId} `);
+        socket.emit('error_message', {message: 'it is not your turn'});
+    }
+    if(game.board[cellIndex] !== null){
+        console.warn(`Warning:Player tried to move occupied cell in room ${roomId}`);
+        socket.emit('error_message', {message: 'this cell is taken'});
+
+        return;
+    }
+
+    game.board[cellIndex] = PlayerSymbol;
+
+    game.currentPlayer = PlayerSymbol === 'X' ? 'O' : 'X' ;
+    activeGames.set(roomId, game);
+
+    io.to(roomId).emit('game_update', {
+        board: game.board,
+        currentPlayer: game.currentPlayer,
+    });
+    console.log(`Move Made by ${PlayerSymbol} in the room, specific cell index`);
+
+}
