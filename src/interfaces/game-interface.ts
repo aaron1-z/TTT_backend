@@ -26,3 +26,8 @@ export interface Game {
 export interface statusPayload {
     message : string;
 }
+
+export interface MovePayload {
+    roomId: string;
+    cellIndex: number;
+}
